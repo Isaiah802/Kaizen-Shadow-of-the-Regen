@@ -67,10 +67,15 @@ void Game::update(float deltaTime) {
         return;
     }
     
+    // Update moving platforms
+    for (auto& platform : m_platforms) {
+        platform.update(deltaTime);
+    }
+
     // Update player
     if (m_player) {
         m_player->update(deltaTime);
-        handlePlatformCollisions();
+        handlePlatformCollisions(deltaTime);
         
         // Update camera to follow player
         if (m_camera) {
@@ -152,37 +157,43 @@ void Game::initializeLevel() {
     // Create a larger test level that requires camera scrolling
     
     // Ground platform (extended width for scrolling)
-    m_platforms.emplace_back(0.f, 600.f, 2560.f, 120.f);
+    m_platforms.emplace_back(0.f, 600.f, 2560.f, 120.f, Platform::Type::Solid);
     
     // Starting area - staircase up
-    m_platforms.emplace_back(200.f, 500.f, 150.f, 20.f);
-    m_platforms.emplace_back(400.f, 400.f, 150.f, 20.f);
-    m_platforms.emplace_back(600.f, 300.f, 150.f, 20.f);
-    m_platforms.emplace_back(800.f, 200.f, 150.f, 20.f);
+    m_platforms.emplace_back(200.f, 500.f, 150.f, 20.f, Platform::Type::OneWay);
+    m_platforms.emplace_back(400.f, 400.f, 150.f, 20.f, Platform::Type::OneWay);
+    m_platforms.emplace_back(600.f, 300.f, 150.f, 20.f, Platform::Type::OneWay);
+    m_platforms.emplace_back(800.f, 200.f, 150.f, 20.f, Platform::Type::OneWay);
     
     // Wall jump challenge area - tall walls for wall slide/jump practice
-    m_platforms.emplace_back(950.f, 200.f, 20.f, 400.f);  // Left wall
-    m_platforms.emplace_back(1200.f, 300.f, 20.f, 300.f);  // Right wall
+    m_platforms.emplace_back(950.f, 200.f, 20.f, 400.f, Platform::Type::Solid);  // Left wall
+    m_platforms.emplace_back(1200.f, 300.f, 20.f, 300.f, Platform::Type::Solid);  // Right wall
     
     // High platform area
-    m_platforms.emplace_back(1000.f, 150.f, 300.f, 20.f);
-    m_platforms.emplace_back(1100.f, 250.f, 100.f, 20.f);
+    m_platforms.emplace_back(1000.f, 150.f, 300.f, 20.f, Platform::Type::Solid);
+    m_platforms.emplace_back(1100.f, 250.f, 100.f, 20.f, Platform::Type::OneWay);
     
     // Mid-section with gaps and walls
-    m_platforms.emplace_back(1400.f, 450.f, 150.f, 20.f);
-    m_platforms.emplace_back(1550.f, 350.f, 20.f, 250.f);  // Wall for practice
-    m_platforms.emplace_back(1600.f, 350.f, 150.f, 20.f);
-    m_platforms.emplace_back(1800.f, 250.f, 150.f, 20.f);
+    m_platforms.emplace_back(1400.f, 450.f, 150.f, 20.f, Platform::Type::OneWay);
+    m_platforms.emplace_back(1550.f, 350.f, 20.f, 250.f, Platform::Type::Solid);  // Wall for practice
+    m_platforms.emplace_back(1600.f, 350.f, 150.f, 20.f, Platform::Type::OneWay);
+    m_platforms.emplace_back(1800.f, 250.f, 150.f, 20.f, Platform::Type::OneWay);
     
     // End area - descending
-    m_platforms.emplace_back(2000.f, 200.f, 150.f, 20.f);
-    m_platforms.emplace_back(2200.f, 300.f, 150.f, 20.f);
-    m_platforms.emplace_back(2350.f, 450.f, 200.f, 20.f);
+    m_platforms.emplace_back(2000.f, 200.f, 150.f, 20.f, Platform::Type::OneWay);
+    m_platforms.emplace_back(2200.f, 300.f, 150.f, 20.f, Platform::Type::OneWay);
+    m_platforms.emplace_back(2350.f, 450.f, 200.f, 20.f, Platform::Type::OneWay);
     
     // Some floating challenge platforms with wall jump opportunities
-    m_platforms.emplace_back(100.f, 250.f, 80.f, 20.f);
-    m_platforms.emplace_back(1350.f, 150.f, 80.f, 20.f);
-    m_platforms.emplace_back(1280.f, 200.f, 20.f, 200.f);  // Tall wall for wall climbing
+    m_platforms.emplace_back(100.f, 250.f, 80.f, 20.f, Platform::Type::OneWay);
+    m_platforms.emplace_back(1350.f, 150.f, 80.f, 20.f, Platform::Type::OneWay);
+    m_platforms.emplace_back(1280.f, 200.f, 20.f, 200.f, Platform::Type::Solid);  // Tall wall for wall climbing
+
+    // Moving platforms (test section)
+    // Horizontal moving platform: moves 200px at 80 px/s
+    m_platforms.emplace_back(300.f, 520.f, 140.f, 18.f, Platform::Type::Moving, sf::Vector2f(1.f, 0.f), 200.f, 80.f);
+    // Vertical moving platform: moves 120px at 60 px/s
+    m_platforms.emplace_back(1700.f, 320.f, 120.f, 18.f, Platform::Type::Moving, sf::Vector2f(0.f, -1.f), 120.f, 60.f);
     
     // Spawn varied enemies at strategic locations
     // Starting area - basic melee enemy
@@ -208,7 +219,7 @@ void Game::initializeLevel() {
     m_boss = std::make_unique<Boss>(Boss::BossType::Executioner, sf::Vector2f(2300.f, 510.f));
 }
 
-void Game::handlePlatformCollisions() {
+void Game::handlePlatformCollisions(float deltaTime) {
     if (!m_player) return;
     
     sf::FloatRect playerBounds = m_player->getBounds();
@@ -235,13 +246,33 @@ void Game::handlePlatformCollisions() {
             float minOverlap = std::min(std::min(overlapLeft, overlapRight), 
                                         std::min(overlapTop, overlapBottom));
             
-            // Resolve collision based on direction
+            // One-way platforms: only resolve top collisions when falling and approaching from above
+            if (platform.isOneWay()) {
+                bool feetAboveTop = (playerBounds.position.y + playerBounds.size.y) <= (platformBounds.position.y + 6.f);
+                if (minOverlap == overlapTop && playerVelocity.y > 0 && feetAboveTop) {
+                    m_player->setPosition(playerBounds.position.x,
+                                          platformBounds.position.y - playerBounds.size.y);
+                    m_player->setVelocity(playerVelocity.x, 0.f);
+                    onGround = true;
+                }
+                // Ignore side and bottom collisions for one-way platforms
+                continue;
+            }
+
+            // Resolve collision based on direction (solid/moving)
             if (minOverlap == overlapTop && playerVelocity.y > 0) {
                 // Collision from top (player landing on platform)
                 m_player->setPosition(playerBounds.position.x, 
                                      platformBounds.position.y - playerBounds.size.y);
                 m_player->setVelocity(playerVelocity.x, 0.f);
                 onGround = true;
+
+                // Carry the player with moving platforms horizontally
+                if (platform.isMoving()) {
+                    sf::Vector2f pv = platform.getVelocity();
+                    m_player->setPosition(m_player->getPosition().x + pv.x * deltaTime,
+                                          m_player->getPosition().y);
+                }
             }
             else if (minOverlap == overlapBottom && playerVelocity.y < 0) {
                 // Collision from bottom (player hitting head)

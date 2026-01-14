@@ -55,8 +55,9 @@ private:
     
     /**
      * @brief Handle collision between player and platforms
+     * @param deltaTime Time elapsed since last frame (used for moving platform carry)
      */
-    void handlePlatformCollisions();
+    void handlePlatformCollisions(float deltaTime);
     
     /**
      * @brief Handle hit detection between attacks and entities
