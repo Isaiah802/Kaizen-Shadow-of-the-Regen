@@ -1,0 +1,64 @@
+name: Build
+
+on:
+  push:
+    branches: [ main, master, dev ]
+  pull_request:
+    branches: [ main, master, dev ]
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup MSYS2
+      uses: msys2/setup-msys2@v2
+      with:
+        msystem: MINGW64
+        update: true
+        install: >-
+          mingw-w64-x86_64-gcc
+          mingw-w64-x86_64-cmake
+          mingw-w64-x86_64-sfml
+          make
+    
+    - name: Configure CMake
+      shell: msys2 {0}
+      run: cmake -S . -B build -G "MinGW Makefiles"
+    
+    - name: Build
+      shell: msys2 {0}
+      run: cmake --build build --config Release
+    
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: Kaizen-Windows
+        path: build/bin/Kaizen.exe
+        retention-days: 7
+
+  build-linux:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake g++ libsfml-dev
+    
+    - name: Configure CMake
+      run: cmake -S . -B build
+    
+    - name: Build
+      run: cmake --build build --config Release
+    
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: Kaizen-Linux
+        path: build/bin/Kaizen
+        retention-days: 7
