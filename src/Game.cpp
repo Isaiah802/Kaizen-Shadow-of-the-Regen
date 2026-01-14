@@ -184,11 +184,25 @@ void Game::initializeLevel() {
     m_platforms.emplace_back(1350.f, 150.f, 80.f, 20.f);
     m_platforms.emplace_back(1280.f, 200.f, 20.f, 200.f);  // Tall wall for wall climbing
     
-    // Spawn enemies at strategic locations
-    m_enemies.push_back(std::make_unique<Enemy>(sf::Vector2f(500.f, 530.f), 150.f));
-    m_enemies.push_back(std::make_unique<Enemy>(sf::Vector2f(900.f, 530.f), 200.f));
-    m_enemies.push_back(std::make_unique<Enemy>(sf::Vector2f(1500.f, 380.f), 120.f));
-    m_enemies.push_back(std::make_unique<Enemy>(sf::Vector2f(2100.f, 530.f), 180.f));
+    // Spawn varied enemies at strategic locations
+    // Starting area - basic melee enemy
+    m_enemies.push_back(std::make_unique<Enemy>(sf::Vector2f(500.f, 530.f), 150.f, Enemy::EnemyType::Melee));
+    
+    // Wall jump area - flying enemy to test aerial combat
+    m_enemies.push_back(std::make_unique<Enemy>(sf::Vector2f(1100.f, 350.f), 200.f, Enemy::EnemyType::Flying));
+    
+    // Mid section - ranged enemy on platform
+    m_enemies.push_back(std::make_unique<Enemy>(sf::Vector2f(1450.f, 380.f), 100.f, Enemy::EnemyType::Ranged));
+    
+    // Tank enemy before high platform
+    m_enemies.push_back(std::make_unique<Enemy>(sf::Vector2f(900.f, 530.f), 180.f, Enemy::EnemyType::Tank));
+    
+    // Late area mix - ranged and melee
+    m_enemies.push_back(std::make_unique<Enemy>(sf::Vector2f(1800.f, 180.f), 100.f, Enemy::EnemyType::Ranged));
+    m_enemies.push_back(std::make_unique<Enemy>(sf::Vector2f(2000.f, 130.f), 120.f, Enemy::EnemyType::Melee));
+    
+    // Pre-boss gauntlet
+    m_enemies.push_back(std::make_unique<Enemy>(sf::Vector2f(2100.f, 530.f), 150.f, Enemy::EnemyType::Flying));
     
     // Spawn boss at the end of the level
     m_boss = std::make_unique<Boss>(Boss::BossType::Executioner, sf::Vector2f(2300.f, 510.f));
@@ -333,6 +347,37 @@ void Game::handleCombat() {
     for (const auto& enemy : m_enemies) {
         if (!enemy || !enemy->isActive() || enemy->isDead()) continue;
         
+        // Check enemy projectiles hitting player
+        for (const auto& projectile : enemy->getProjectiles()) {
+            if (!projectile || !projectile->isActive()) continue;
+            
+            sf::FloatRect projectileBounds = projectile->getBounds();
+            sf::FloatRect playerBounds = m_player->getBounds();
+            
+            if (Physics::checkCollision(projectileBounds, playerBounds)) {
+                projectile->deactivate();
+                
+                if (m_player->isParrying()) {
+                    const bool perfect = m_player->isPerfectParryWindow();
+                    m_effectsManager.getHitFreeze().trigger(perfect ? 0.08f : 0.05f);
+                    if (m_camera) {
+                        m_camera->shake(perfect ? 6.f : 4.f, perfect ? 0.15f : 0.1f);
+                    }
+                    // Parry projectile flash
+                    sf::Vector2f parryPos(playerBounds.position.x + playerBounds.size.x / 2, playerBounds.position.y + playerBounds.size.y / 2);
+                    m_effectsManager.addFlash(parryPos, perfect ? sf::Color(170, 230, 255) : sf::Color(120, 210, 255), perfect ? 35.f : 25.f, perfect ? 0.2f : 0.15f);
+                } else {
+                    m_player->takeDamage(projectile->getDamage());
+                    if (m_camera && !m_player->isInvulnerable()) {
+                        m_camera->shake(8.f, 0.2f);
+                        sf::Vector2f hitPos(playerBounds.position.x + playerBounds.size.x / 2, playerBounds.position.y + playerBounds.size.y / 2);
+                        m_effectsManager.addFlash(hitPos, sf::Color(255, 50, 50), 18.f, 0.12f);
+                    }
+                }
+            }
+        }
+        
+        // Check melee attacks
         if (enemy->isAttacking()) {
             sf::FloatRect enemyAttackHitbox = enemy->getAttackHitbox();
             sf::FloatRect playerBounds = m_player->getBounds();
