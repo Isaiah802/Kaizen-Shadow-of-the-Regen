@@ -96,6 +96,22 @@ void HUD::render(sf::RenderWindow& window, const Player* player, const Boss* bos
         comboCircle.setOutlineColor(sf::Color(255, 255, 255, 180));
         window.draw(comboCircle);
         
+        // Draw small dots to represent combo count visually
+        int comboCount = player->getComboCount();
+        for (int i = 0; i < comboCount && i < 3; ++i) {
+            float dotSize = 8.f;
+            float dotSpacing = 18.f;
+            float dotX = comboX + comboSize / 2.f - ((comboCount - 1) * dotSpacing) / 2.f + i * dotSpacing;
+            float dotY = comboY + comboSize / 2.f - dotSize / 2.f;
+            
+            sf::CircleShape dot(dotSize);
+            dot.setPosition(sf::Vector2f(dotX - dotSize, dotY));
+            dot.setFillColor(sf::Color(255, 255, 255));
+            dot.setOutlineThickness(1.f);
+            dot.setOutlineColor(sf::Color(200, 200, 200));
+            window.draw(dot);
+        }
+        
         // Combo timer indicator (ring around circle)
         float timerFraction = player->getComboTimer() / 0.8f;  // COMBO_WINDOW
         if (timerFraction > 0.f) {
@@ -133,6 +149,17 @@ void HUD::render(sf::RenderWindow& window, const Player* player, const Boss* bos
         // Color changes as it charges
         if (chargeLevel >= 1.0f) {
             chargeFill.setFillColor(sf::Color(255, 255, 0));  // Max charge - yellow
+            
+            // Pulsing glow effect when fully charged
+            float pulse = std::sin(std::clock() / 100000.f) * 0.4f + 0.6f;
+            sf::RectangleShape chargeGlow(sf::Vector2f(barWidth, barHeight));
+            chargeGlow.setPosition(sf::Vector2f(chargeX, chargeY));
+            chargeGlow.setFillColor(sf::Color::Transparent);
+            chargeGlow.setOutlineThickness(3.f);
+            sf::Color glowColor = sf::Color(255, 255, 100);
+            glowColor.a = static_cast<uint8_t>(200 * pulse);
+            chargeGlow.setOutlineColor(glowColor);
+            window.draw(chargeGlow);
         } else if (chargeLevel >= 0.5f) {
             chargeFill.setFillColor(sf::Color(255, 150, 50));  // Mid charge - orange
         } else {
@@ -214,6 +241,15 @@ void HUD::render(sf::RenderWindow& window, const Player* player, const Boss* bos
 void HUD::drawCooldownBar(sf::RenderWindow& window, float x, float y, float width, float height,
                          float remaining, float max, const sf::Color& color, const std::string& label) {
     (void)label;
+    
+    // Ability icon (small colored circle)
+    sf::CircleShape icon(height / 2.f);
+    icon.setPosition(sf::Vector2f(x - height - 5.f, y));
+    icon.setFillColor(color);
+    icon.setOutlineThickness(1.f);
+    icon.setOutlineColor(sf::Color(200, 200, 200));
+    window.draw(icon);
+    
     // Background
     sf::RectangleShape background(sf::Vector2f(width, height));
     background.setFillColor(sf::Color(40, 40, 40));
@@ -235,11 +271,18 @@ void HUD::drawCooldownBar(sf::RenderWindow& window, float x, float y, float widt
     border.setPosition(sf::Vector2f(x, y));
     window.draw(border);
     
-    // Label background (small)
-    sf::RectangleShape labelBg(sf::Vector2f(40.f, 10.f));
-    labelBg.setFillColor(sf::Color(20, 20, 20));
-    labelBg.setPosition(sf::Vector2f(x - 45.f, y + 2.f));
-    window.draw(labelBg);
+    // Ready indicator (glow when available)
+    if (fraction >= 1.f) {
+        sf::RectangleShape readyGlow(sf::Vector2f(width, height));
+        readyGlow.setPosition(sf::Vector2f(x, y));
+        readyGlow.setFillColor(sf::Color::Transparent);
+        readyGlow.setOutlineThickness(2.f);
+        sf::Color glowColor = color;
+        float pulse = std::sin(std::clock() / 150000.f) * 0.3f + 0.7f;
+        glowColor.a = static_cast<uint8_t>(180 * pulse);
+        readyGlow.setOutlineColor(glowColor);
+        window.draw(readyGlow);
+    }
 }
 
 void HUD::drawHealthBar(sf::RenderWindow& window, float x, float y, float width, float height,

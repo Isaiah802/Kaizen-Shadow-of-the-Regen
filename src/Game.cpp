@@ -136,6 +136,9 @@ void Game::render() {
     // Render visual effects (flash effects, attack trails, etc.)
     m_effectsManager.render(m_window);
 
+    // Switch to default view for HUD (screen-space coordinates)
+    m_window.setView(m_window.getDefaultView());
+    
     // Render HUD overlay
     if (m_hud) {
         m_hud->render(m_window, m_player.get(), m_boss.get());
